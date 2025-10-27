@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>FastAPI Stream</title>
+  </head>
+  <body>
+    <h1>Streaming Data</h1>
+    <pre id="output"></pre>
+
+    <script>
+      const ws = new WebSocket(`ws://${window.location.host}/ws`);
+      const output = document.getElementById("output");
+
+      ws.onmessage = (event) => {
+        output.textContent += event.data + "\n";
+      };
+    </script>
+  </body>
+</html>

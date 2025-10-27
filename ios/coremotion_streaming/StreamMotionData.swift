@@ -15,7 +15,7 @@ class StreamMotionData : WebSocketDelegate {
     
     var socket: WebSocket!
     init() {
-        var request = URLRequest(url: URL(string: "ws://192.168.1.227:8080")!) //ws or wss for websockets with startscream.
+        var request = URLRequest(url: URL(string: "ws://192.168.1.227:8000/ws")!) //ws or wss for websockets with startscream.
         request.timeoutInterval = 5
         socket = WebSocket(request: request)
         socket.delegate = self

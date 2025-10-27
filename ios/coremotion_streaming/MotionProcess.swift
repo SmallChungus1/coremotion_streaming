@@ -14,6 +14,8 @@ import CoreMotion
 import Combine
 
 class MotionProcess: ObservableObject {
+    private var streamer = StreamMotionData()
+
     @Published var motionData: [String: [Double]] = [:]
     private var motion: CMMotionManager!
     private var timer: Timer!
@@ -58,7 +60,8 @@ class MotionProcess: ObservableObject {
                                     self.motionData["accl_x", default: []].append(acc.x)
                                     self.motionData["accl_y", default: []].append(acc.y)
                                     self.motionData["accl_z", default: []].append(acc.z)
-
+                                    
+                                    self.streamer.writeSingleData(pitch: a.pitch, roll: a.roll, yaw: a.yaw)
                                     
                                 }
             })

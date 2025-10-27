@@ -9,7 +9,6 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var motion = MotionProcess()
-    private var streamer = StreamMotionData()
     
     var body: some View {
         VStack(spacing: 16) {
