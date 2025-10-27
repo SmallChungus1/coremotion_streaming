@@ -14,6 +14,7 @@
 /* Begin PBXFileReference section */
 		4201C34F2EAF3E0700F0FCDA /* coremotion_streaming.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = coremotion_streaming.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		426A266C2EAFC3E500C060CC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
+		426A26702EAFF44400C060CC /* coremotion-streaming-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "coremotion-streaming-Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -44,6 +45,7 @@
 		4201C3462EAF3E0700F0FCDA = {
 			isa = PBXGroup;
 			children = (
+				426A26702EAFF44400C060CC /* coremotion-streaming-Info.plist */,
 				426A266C2EAFC3E500C060CC /* README.md */,
 				4201C3672EAF587300F0FCDA /* server */,
 				4201C3662EAF586D00F0FCDA /* ios */,
@@ -275,6 +277,9 @@
 				DEVELOPMENT_TEAM = 4PFH623WT3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "coremotion-streaming-Info.plist";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs your location for streaming location data.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs your location for streaming location data.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -314,6 +319,9 @@
 				DEVELOPMENT_TEAM = 4PFH623WT3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "coremotion-streaming-Info.plist";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "This app needs your location for streaming location data.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "This app needs your location for streaming location data.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
