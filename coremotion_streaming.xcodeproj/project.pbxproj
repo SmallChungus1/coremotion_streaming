@@ -8,10 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		4201C3632EAF4F8100F0FCDA /* Starscream in Frameworks */ = {isa = PBXBuildFile; productRef = 4201C3622EAF4F8100F0FCDA /* Starscream */; };
+		426A266D2EAFC3E500C060CC /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 426A266C2EAFC3E500C060CC /* README.md */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		4201C34F2EAF3E0700F0FCDA /* coremotion_streaming.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = coremotion_streaming.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		426A266C2EAFC3E500C060CC /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -42,6 +44,7 @@
 		4201C3462EAF3E0700F0FCDA = {
 			isa = PBXGroup;
 			children = (
+				426A266C2EAFC3E500C060CC /* README.md */,
 				4201C3672EAF587300F0FCDA /* server */,
 				4201C3662EAF586D00F0FCDA /* ios */,
 				4201C3502EAF3E0700F0FCDA /* Products */,
@@ -124,6 +127,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				426A266D2EAFC3E500C060CC /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
