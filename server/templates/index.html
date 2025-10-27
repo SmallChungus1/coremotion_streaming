@@ -8,10 +8,10 @@
     <pre id="output"></pre>
 
     <script>
-      const ws = new WebSocket(`ws://${window.location.host}/ws`);
+      const ws = new WebSocket(`ws://192.168.1.227:8000/ws`);
       const output = document.getElementById("output");
-
       ws.onmessage = (event) => {
+        console.log(event.data)
         output.textContent += event.data + "\n";
       };
     </script>
