@@ -9,7 +9,8 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var motion = MotionProcess()
-
+    private var streamer = StreamMotionData()
+    
     var body: some View {
         VStack(spacing: 16) {
             Text("📱 CoreMotion Stream")
@@ -28,14 +29,14 @@ struct ContentView: View {
                 }
                 .font(.system(.body, design: .monospaced))
             } else {
-                Text("Waiting for motion data…")
+                Text("No Motion Data Currently Available From Device")
                     .foregroundColor(.secondary)
             }
 
             Button(action: {
                 motion.getDeviceMotion()
             }) {
-                Text("Start Motion Updates")
+                Text("Start Sending Motion Updates")
                     .padding()
                     .background(Color.blue.opacity(0.2))
                     .cornerRadius(10)
@@ -44,7 +45,7 @@ struct ContentView: View {
             Button(action: {
                 motion.stopGetMotion()
             }) {
-                Text("Stop")
+                Text("Stop Sending")
                     .padding()
                     .background(Color.red.opacity(0.2))
                     .cornerRadius(10)

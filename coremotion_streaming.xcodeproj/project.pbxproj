@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4201C3632EAF4F8100F0FCDA /* Starscream in Frameworks */ = {isa = PBXBuildFile; productRef = 4201C3622EAF4F8100F0FCDA /* Starscream */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		4201C34F2EAF3E0700F0FCDA /* coremotion_streaming.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = coremotion_streaming.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +27,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4201C3632EAF4F8100F0FCDA /* Starscream in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +70,7 @@
 			);
 			name = coremotion_streaming;
 			packageProductDependencies = (
+				4201C3622EAF4F8100F0FCDA /* Starscream */,
 			);
 			productName = coremotion_streaming;
 			productReference = 4201C34F2EAF3E0700F0FCDA /* coremotion_streaming.app */;
@@ -94,6 +100,9 @@
 			);
 			mainGroup = 4201C3462EAF3E0700F0FCDA;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4201C3612EAF4F8100F0FCDA /* XCRemoteSwiftPackageReference "Starscream" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4201C3502EAF3E0700F0FCDA /* Products */;
 			projectDirPath = "";
@@ -334,6 +343,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		4201C3612EAF4F8100F0FCDA /* XCRemoteSwiftPackageReference "Starscream" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/daltoniam/Starscream.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.0.8;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4201C3622EAF4F8100F0FCDA /* Starscream */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4201C3612EAF4F8100F0FCDA /* XCRemoteSwiftPackageReference "Starscream" */;
+			productName = Starscream;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4201C3472EAF3E0700F0FCDA /* Project object */;
 }
