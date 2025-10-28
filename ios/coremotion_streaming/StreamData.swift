@@ -11,7 +11,7 @@
 import Foundation
 import Starscream
 
-class StreamMotionData : WebSocketDelegate {
+class StreamData : WebSocketDelegate {
     
     var socket: WebSocket!
     init() {
@@ -37,7 +37,7 @@ class StreamMotionData : WebSocketDelegate {
         }
     }
     
-    func writeEntireData(dict: [String:[Double]]){
+    func writeEntireMotionData(dict: [String:[Double]]){
         guard let json = try? JSONSerialization.data(withJSONObject: dict) else {
             print("JSON encoding failed")
             return
@@ -45,7 +45,7 @@ class StreamMotionData : WebSocketDelegate {
         self.socket.write(data: json, completion: .none)
     }
     
-    func writeSingleData(pitch: Double, roll: Double, yaw: Double){
+    func writeSingleMotionData(pitch: Double, roll: Double, yaw: Double){
         let cur_data_packet = ["pitch": pitch, "roll": roll, "yaw": yaw]
         
         guard let json = try? JSONSerialization.data(withJSONObject: cur_data_packet) else {
@@ -55,6 +55,24 @@ class StreamMotionData : WebSocketDelegate {
         
         self.socket.write(data: json, completion: .none)
     }
+    
+    //takes in any dict of modeling motion data and location data attributes, convert to json and stream without enforcing schema checks.
+    //TODO: think about if we need to enforce schema checks?
+    func writeCombinedMotionLocationData(motion_data: [String:Double], location_data: [String:Double]){
+        
+        //combine 2 dicts
+        let merged_dict = motion_data.merging(location_data) { (motionVals, locationVals) in
+            return motionVals + locationVals
+        }
+        
+        //conv to json
+        guard let json = try? JSONSerialization.data(withJSONObject: merged_dict) else {
+            print("JSON encoding failed")
+            return}
+        
+        self.socket.write(data: json, completion: .none)
+        
+        }
     
     func websocketDisconnect(){
         self.socket.disconnect()

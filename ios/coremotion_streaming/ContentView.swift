@@ -10,6 +10,16 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var motion = MotionProcess()
     @StateObject private var location = LocationProcess()
+    @StateObject private var combinedStream: CombineMotionLocationStream
+    
+    // Custom initializer to set up combined stream after motion and location
+    init() {
+        let motion = MotionProcess()
+        let location = LocationProcess()
+        _motion = StateObject(wrappedValue: motion)
+        _location = StateObject(wrappedValue: location)
+        _combinedStream = StateObject(wrappedValue: CombineMotionLocationStream(motion: motion, location: location))
+    }
     
     var body: some View {
         ScrollView {
@@ -23,39 +33,31 @@ struct ContentView: View {
                         .font(.headline)
                     if let pitch = motion.motionData["pitch"]?.last,
                        let roll = motion.motionData["roll"]?.last,
-                       let yaw = motion.motionData["yaw"]?.last {
+                       let yaw = motion.motionData["yaw"]?.last,
+                       let lat = location.lat,
+                       let lon = location.long,
+                       let cl_speed = location.cl_speed{
                         Text("Pitch: \(pitch, specifier: "%.3f")")
                         Text("Roll:  \(roll, specifier: "%.3f")")
                         Text("Yaw:   \(yaw, specifier: "%.3f")")
+                        Text("Latitude:  \(lat, specifier: "%.6f")")
+                        Text("Longitude: \(lon, specifier: "%.6f")")
+                        Text("speed: \(cl_speed, specifier: "%.5f")")
                     } else {
-                        Text("No Motion Data Yet")
+                        Text("No Motion or Location Data Yet")
                             .foregroundColor(.secondary)
                     }
                     
                     HStack {
-                        Button("Start Motion") { motion.getDeviceMotion() }
-                        Button("Stop") { motion.stopGetMotion() }
-                    }
-                    .buttonStyle(.bordered)
-                }
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("CoreLocation Data")
-                        .font(.headline)
-                    if let lat = location.lat, let lon = location.long {
-                        Text("Latitude:  \(lat, specifier: "%.5f")")
-                        Text("Longitude: \(lon, specifier: "%.5f")")
-                        if let acc = location.loc_horizontal_acc {
-                            Text("Accuracy: ±\(acc, specifier: "%.1f") m")
+                        Button("Start Motion") {
+                            motion.getDeviceMotion()
+                            location.requestLocationUpdate()  //note that location streaming will start automatically due
                         }
-                    } else {
-                        Text("No Location Data Yet")
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    HStack {
-                        Button("Start Location") { location.requestLocationUpdate() }
-                        Button("Stop") { location.stopLocationUpdate() }
+                        Button("Stop") {
+                            motion.stopGetMotion()
+                            location.stopLocationUpdate()
+                            
+                        }
                     }
                     .buttonStyle(.bordered)
                 }

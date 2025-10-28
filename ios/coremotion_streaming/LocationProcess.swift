@@ -18,30 +18,62 @@ import Combine
 final class LocationProcess: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private let locationManager = CLLocationManager()
+    
     @Published var long: Double? = nil
     @Published var lat: Double? = nil
-    @Published var loc_horizontal_acc: Double? = nil
+//    @Published var loc_horizontal_acc: Double? = nil //not sure how useful this is
+    @Published var cl_speed: Double? = nil //speed m/s given by corelocation
     
     override init() {
         super.init()
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation  //use kCLLocationAccuracyBestForNavigation for more frequent updates, use kCLLocationAccuracyBest for default option
+        locationManager.distanceFilter = kCLDistanceFilterNone
+        
+        
+        locationManager.requestWhenInUseAuthorization()
 
-        if CLLocationManager.locationServicesEnabled() {
-            locationManager.requestWhenInUseAuthorization() //when in use just for testing, change to always in use if we want to stream location 24/7. For always allow need when in use auth first
-        }else{
-            print("Location Service is not enabled!")
-        }
+        //gives 'this method can cause UI unresponsiveness' because it is synchronus
+//        if CLLocationManager.locationServicesEnabled() {
+//            locationManager.requestWhenInUseAuthorization() //when in use just for testing, change to always in use if we want to stream location 24/7. For always allow need when in use auth first
+//            
+//        }else{
+//            print("Location Service is not enabled!")
+//        }
                 
     }
     
     //startUpdatingLocation for streaming. Uses up battery so be careful with background streaming
     func requestLocationUpdate() {
-        locationManager.startUpdatingLocation() //returns to CLLocationManagerDelegate function, which needs to be implemenetd
+        // Only start if authorized
+        let status = locationManager.authorizationStatus
+        if status == .authorizedAlways || status == .authorizedWhenInUse {
+            locationManager.startUpdatingLocation() //returns to CLLocationManagerDelegate function, which needs to be implemenetd
+        } else {
+            locationManager.requestWhenInUseAuthorization()
+        }
     }
     
     func stopLocationUpdate() {
+        
         locationManager.stopUpdatingLocation()
+    }
+
+    //checks authorization status and call startUpdatingLocation if applicable
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        switch manager.authorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            print("Location authorized, starting updates")
+            locationManager.startUpdatingLocation()
+        case .denied, .restricted:
+            print("Location permission denied/restricted")
+            locationManager.stopUpdatingLocation()
+        case .notDetermined:
+            print("Location permission not determined yet")
+            locationManager.requestWhenInUseAuthorization()
+        @unknown default:
+            break
+        }
     }
 
     
@@ -49,8 +81,13 @@ final class LocationProcess: NSObject, ObservableObject, CLLocationManagerDelega
         guard let location = locations.last else { return }
         self.long = location.coordinate.longitude
         self.lat = location.coordinate.latitude
-        self.loc_horizontal_acc = location.horizontalAccuracy
-        print("Latitude: \(self.long), Longitude: \(self.lat)")
+//        self.loc_horizontal_acc = location.horizontalAccuracy
+        if location.speed > 0 {
+            self.cl_speed = location.speed
+        }else{
+            self.cl_speed = 0.0 //would be -1.0 for alot of cases like standing still, being indoors etc
+        }
+//        print("Latitude: \(self.long, default: "0.0"), Longitude: \(self.lat, default: "0.0")")
     }
     
     
