@@ -2,6 +2,14 @@ from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import json
+from kafka import KafkaProducer
+
+
+kafka_host_addr = "localhost:9092"
+kafka_topic = "test-topic1"
+#Fastapi use kafka-python's Kafka producer to send streamed data from iphone to Kafka Cluster
+#kafka-python set up https://kafka-python.readthedocs.io/en/master/apidoc/KafkaProducer.html | https://kafka-python.readthedocs.io/en/master/
+producer = KafkaProducer(bootstrap_servers=kafka_host_addr)
 
 #fastapi templates: https://fastapi.tiangolo.com/advanced/templates/#using-jinja2templates
 #fastapi + websockets quickstart: https://fastapi.tiangolo.com/advanced/websockets/#handling-disconnections-and-multiple-clients
@@ -25,14 +33,25 @@ async def ws_listen(websocket: WebSocket):
             message = await websocket.receive_bytes()
             print("Raw message:", message)
             message_json_str = message.decode('utf-8')
+            
+            #need to send bytes
+            #TODO: investigate if producer.send is synchrous and blocking
+            producer.send(topic=kafka_topic, value=message)
 
             for a_websock in connections:
                 try:
-                    await a_websock.send_json(message_json_str)
+                    await a_websock.send_json(json.loads(message_json_str))
                 except Exception as e:
                     print(f"Exception at websocket send in ws_listen: {e}")
     except WebSocketDisconnect:
         print("Client disconnected")
+        connections.remove(websocket)
+
     except Exception as e:
         print(f"Exception in ws_listen: {e}")
         
+#flush producer buffer upon fastapi app shutdown
+@app.on_event("shutdown")
+def shutdown_event():
+    producer.flush()
+    producer.close()
