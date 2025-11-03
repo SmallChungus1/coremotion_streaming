@@ -6,11 +6,22 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @StateObject private var motion = MotionProcess()
     @StateObject private var location = LocationProcess()
     @StateObject private var combinedStream: CombineMotionLocationStream
+    let deviceName = UIDevice.current.name
+    let isoFormatter = ISO8601DateFormatter()
+    
+    @State private var streamStartTime: String? = nil //only updated when you press 'Start Motion' button, used as part of the key to identify stream sessions
+
+    var streamKey: String? {
+        guard let start = streamStartTime else { return nil }
+        return "\(deviceName)_\(start)"
+    }
+
     
     // Custom initializer to set up combined stream after motion and location
     init() {
@@ -50,6 +61,10 @@ struct ContentView: View {
                     
                     HStack {
                         Button("Start Motion") {
+                            
+                            // Capture the start time exactly once when starting
+                            streamStartTime = isoFormatter.string(from: Date())
+
                             motion.getDeviceMotion()
                             location.requestLocationUpdate()  //note that location streaming will start automatically due
                         }
