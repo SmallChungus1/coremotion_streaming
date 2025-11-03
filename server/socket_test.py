@@ -14,7 +14,7 @@ kafka_topic = "test-topic1"
 try: 
     producer = KafkaProducer(bootstrap_servers=kafka_host_addr)
 except Exception as e:
-    print(f"Error in initalizing KafkaProducer: {e} continuning without it")
+    print(f"Error in initalizing KafkaProducer: {e} continuning without it. WARNING: NOTHING WILL BE STREAMED TO KAFKA")
     producer = None
 
 
@@ -38,9 +38,6 @@ app = FastAPI(lifespan=lifespan)
 connections = set()
 
 templates = Jinja2Templates(directory="./templates")
-
-
-
     
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -62,6 +59,8 @@ async def ws_listen(websocket: WebSocket):
             #TODO: investigate if producer.send is synchrous and blocking
             if producer:
                 producer.send(topic=kafka_topic, value=message)
+            else:
+                print("WARNING NOTHING WAS STREAMED TO KAFKA BECAUSE PRODUCER INIT FAILED")
 
             for a_websock in connections:
                 try:

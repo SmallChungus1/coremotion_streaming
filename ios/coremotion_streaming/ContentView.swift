@@ -8,20 +8,23 @@
 import SwiftUI
 import UIKit
 
+
+
+
 struct ContentView: View {
     @StateObject private var motion = MotionProcess()
     @StateObject private var location = LocationProcess()
     @StateObject private var combinedStream: CombineMotionLocationStream
+    
     let deviceName = UIDevice.current.name
     let isoFormatter = ISO8601DateFormatter()
     
-    @State private var streamStartTime: String? = nil //only updated when you press 'Start Motion' button, used as part of the key to identify stream sessions
-
+    @State private var streamStartTime: String? = nil //only updated when you press 'Start Motion' button, used as part of the key to identify stream sessions var streamKey: String? { guard let start = streamStartTime else { return nil } return "\(deviceName)_\(start)" }
+    
     var streamKey: String? {
-        guard let start = streamStartTime else { return nil }
+        guard let start = streamStartTime else { return "noKey" }
         return "\(deviceName)_\(start)"
     }
-
     
     // Custom initializer to set up combined stream after motion and location
     init() {
@@ -64,7 +67,9 @@ struct ContentView: View {
                             
                             // Capture the start time exactly once when starting
                             streamStartTime = isoFormatter.string(from: Date())
+                            combinedStream.updateStreamKey(streamKey ?? "noKey")
 
+                            
                             motion.getDeviceMotion()
                             location.requestLocationUpdate()  //note that location streaming will start automatically due
                         }

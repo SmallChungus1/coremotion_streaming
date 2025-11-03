@@ -16,8 +16,11 @@ final class CombineMotionLocationStream: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private let streamer = StreamData()
+    @Published var streamKey: String
     
     init(motion: MotionProcess, location: LocationProcess) {
+        self.streamKey = "noKey" //no stream key by default until button press of 'Start Motion' button triggers update_streamkey
+        
         // CombineLatest merges new motion data and location data. Can combine up to 4 publisher using CombineLatestX, where x <= 4. If x > 4, use commented code block below
         
         Publishers.CombineLatest4(motion.$motionData, location.$cl_speed, location.$lat, location.$long)
@@ -45,10 +48,17 @@ final class CombineMotionLocationStream: ObservableObject {
             //call the stream method
             self.streamer.writeCombinedMotionLocationData(
                 motion_data: motion_dict,
-                location_data: location_dict
+                location_data: location_dict,
+                stream_key: self.streamKey
             )
         }
         .store(in: &cancellables) //need this to keep subscriptions alive as long as method class instance is alive
+    }
+    
+    func updateStreamKey(_ newKey: String) {
+        self.streamKey = newKey
+        //print("Updated streamKey to \(newKey)")
+        // (optional) restart or reconfigure any streaming logic
     }
 }
 

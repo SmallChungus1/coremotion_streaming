@@ -58,13 +58,16 @@ class StreamData : WebSocketDelegate {
     
     //takes in any dict of modeling motion data and location data attributes, convert to json and stream without enforcing schema checks.
     //TODO: think about if we need to enforce schema checks?
-    func writeCombinedMotionLocationData(motion_data: [String:Double], location_data: [String:Double]){
+    func writeCombinedMotionLocationData(motion_data: [String:Double], location_data: [String:Double], stream_key: String){
         
         //combine 2 dicts
         let merged_dict = motion_data.merging(location_data) { (motionVals, locationVals) in
             return motionVals + locationVals
         }
-        
+        // Insert the stream_key alongside numeric fields
+        var payload: [String: Any] = merged_dict
+        payload["stream_key"] = stream_key
+
         //conv to json
         guard let json = try? JSONSerialization.data(withJSONObject: merged_dict) else {
             print("JSON encoding failed")
