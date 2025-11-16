@@ -69,7 +69,7 @@ class StreamData : WebSocketDelegate {
         payload["stream_key"] = stream_key
 
         //conv to json
-        guard let json = try? JSONSerialization.data(withJSONObject: merged_dict) else {
+        guard let json = try? JSONSerialization.data(withJSONObject: payload) else {
             print("JSON encoding failed")
             return}
         

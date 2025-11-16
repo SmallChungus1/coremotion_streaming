@@ -16,7 +16,9 @@ struct ContentView: View {
     @StateObject private var location = LocationProcess()
     @StateObject private var combinedStream: CombineMotionLocationStream
     
-    let deviceName = UIDevice.current.name
+//    let deviceName = UIDevice.current.name //ios16+ Apple masks the actual device name so you get generic ones like 'iPhone' need special permissions
+    let deviceName = String(Int.random(in: 0_000_000_001...9_999_999_999)) //just generate random number with string instead for deviceName to avoid collisions
+    
     let isoFormatter = ISO8601DateFormatter()
     
     @State private var streamStartTime: String? = nil //only updated when you press 'Start Motion' button, used as part of the key to identify stream sessions var streamKey: String? { guard let start = streamStartTime else { return nil } return "\(deviceName)_\(start)" }
