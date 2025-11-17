@@ -1,12 +1,14 @@
 {
   "type": "struct",
   "fields": [
-    {"name": "stream_key", "type": "string", "nullable": true},
-    {"name": "pitch", "type": "double", "nullable": true},
-    {"name": "yaw", "type": "double", "nullable": true},
-    {"name": "roll", "type": "double", "nullable": true},
-    {"name": "lat", "type": "double", "nullable": true},
-    {"name": "lon", "type": "double", "nullable": true},
-    {"name": "speed", "type": "double", "nullable": true}
+    {"name": "stream_key", "type": "string", "nullable": true, "metadata": {}},
+    {"name": "cur_time", "type": "timestamp", "nullable": true, "metadata": {}},
+    {"name": "user_mode", "type": "string", "nullable": true, "metadata": {}},
+    {"name": "pitch", "type": "double", "nullable": true, "metadata": {}},
+    {"name": "yaw", "type": "double", "nullable": true, "metadata": {}},
+    {"name": "roll", "type": "double", "nullable": true, "metadata": {}},
+    {"name": "lat", "type": "double", "nullable": true, "metadata": {}},
+    {"name": "lon", "type": "double", "nullable": true, "metadata": {}},
+    {"name": "speed", "type": "double", "nullable": true, "metadata": {}}
   ]
 }

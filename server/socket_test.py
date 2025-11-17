@@ -54,17 +54,23 @@ async def ws_listen(websocket: WebSocket):
             message = await websocket.receive_bytes()
             print("Raw message:", message)
             message_json_str = message.decode('utf-8')
-            
-            #need to send bytes
-            #TODO: investigate if producer.send is synchrous and blocking
+            try:
+                message_json = json.loads(message_json_str)
+            except json.JSONDecodeError:
+                message_json = {}
+
+            key_value = message_json.get("stream_key")
+            key_bytes = key_value.encode("utf-8") if isinstance(key_value, str) else None
+
+            # need to send bytes; kafka-python accepts None for the key
             if producer:
-                producer.send(topic=kafka_topic, value=message, key=b"stream_key") #kafka keys except bytes
+                producer.send(topic=kafka_topic, value=message, key=key_bytes)
             else:
                 print("WARNING NOTHING WAS STREAMED TO KAFKA BECAUSE PRODUCER INIT FAILED")
 
             for a_websock in connections:
                 try:
-                    await a_websock.send_json(json.loads(message_json_str))
+                    await a_websock.send_json(message_json)
                 except Exception as e:
                     print(f"Exception at websocket send in ws_listen: {e}")
     except WebSocketDisconnect:
