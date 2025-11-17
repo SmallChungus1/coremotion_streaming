@@ -23,6 +23,9 @@ struct ContentView: View {
     
     @State private var streamStartTime: String? = nil //only updated when you press 'Start Motion' button, used as part of the key to identify stream sessions var streamKey: String? { guard let start = streamStartTime else { return nil } return "\(deviceName)_\(start)" }
     
+    //for keeping track of user mode
+    @State private var userMode: String = "on_foot"
+
     var streamKey: String? {
         guard let start = streamStartTime else { return "noKey" }
         return "\(deviceName)_\(start)"
@@ -40,6 +43,20 @@ struct ContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Activity Mode")
+                        .font(.headline)
+
+                    Picker("Mode", selection: $userMode) {
+                        Text("On Foot").tag("on_foot")
+                        Text("Driving").tag("driving")
+                    }
+                    .pickerStyle(.segmented)
+                }
+                .padding(.vertical, 8)
+
+                
                 Text("CoreMotion + CoreLocation Stream")
                     .font(.title2)
                     .bold()
@@ -70,7 +87,7 @@ struct ContentView: View {
                             // Capture the start time exactly once when starting
                             streamStartTime = isoFormatter.string(from: Date())
                             combinedStream.updateStreamKey(streamKey ?? "noKey")
-
+                            combinedStream.updateUserMode(userMode)
                             
                             motion.getDeviceMotion()
                             location.requestLocationUpdate()  //note that location streaming will start automatically due

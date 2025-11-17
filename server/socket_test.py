@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 
 kafka_host_addr = "localhost:9092"
-kafka_topic = "test-topic1"
+kafka_topic = "ios_local_stream"
 #Fastapi use kafka-python's Kafka producer to send streamed data from iphone to Kafka Cluster
 #kafka-python set up https://kafka-python.readthedocs.io/en/master/apidoc/KafkaProducer.html | https://kafka-python.readthedocs.io/en/master/
 
@@ -58,7 +58,7 @@ async def ws_listen(websocket: WebSocket):
             #need to send bytes
             #TODO: investigate if producer.send is synchrous and blocking
             if producer:
-                producer.send(topic=kafka_topic, value=message)
+                producer.send(topic=kafka_topic, value=message, key=b"stream_key") #kafka keys except bytes
             else:
                 print("WARNING NOTHING WAS STREAMED TO KAFKA BECAUSE PRODUCER INIT FAILED")
 

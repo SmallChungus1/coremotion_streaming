@@ -16,6 +16,7 @@ final class CombineMotionLocationStream: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private let streamer = StreamData()
+    private var user_mode = "unknown"
     @Published var streamKey: String
     
     init(motion: MotionProcess, location: LocationProcess) {
@@ -49,7 +50,8 @@ final class CombineMotionLocationStream: ObservableObject {
             self.streamer.writeCombinedMotionLocationData(
                 motion_data: motion_dict,
                 location_data: location_dict,
-                stream_key: self.streamKey
+                stream_key: self.streamKey,
+                user_mode: self.user_mode
             )
         }
         .store(in: &cancellables) //need this to keep subscriptions alive as long as method class instance is alive
@@ -59,6 +61,10 @@ final class CombineMotionLocationStream: ObservableObject {
         self.streamKey = newKey
         //print("Updated streamKey to \(newKey)")
         // (optional) restart or reconfigure any streaming logic
+    }
+    
+    func updateUserMode(_ newMode: String){
+        self.user_mode = newMode
     }
 }
 

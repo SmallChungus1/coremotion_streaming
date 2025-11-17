@@ -1,0 +1,12 @@
+{
+  "type": "struct",
+  "fields": [
+    {"name": "stream_key", "type": "string", "nullable": true},
+    {"name": "pitch", "type": "double", "nullable": true},
+    {"name": "yaw", "type": "double", "nullable": true},
+    {"name": "roll", "type": "double", "nullable": true},
+    {"name": "lat", "type": "double", "nullable": true},
+    {"name": "lon", "type": "double", "nullable": true},
+    {"name": "speed", "type": "double", "nullable": true}
+  ]
+}
