@@ -16,8 +16,23 @@ class StreamData : WebSocketDelegate {
     var socket: WebSocket!
     let isoFormatter = ISO8601DateFormatter()
 
+    struct AppConfig {
+
+        static var wsURL: String {
+            guard
+                let url = Bundle.main.object(forInfoDictionaryKey: "WS_URL") as? String
+            else {
+                fatalError("WS_URL not found in Info.plist")
+            }
+            return url
+        }
+    }
+
+
     init() {
-        var request = URLRequest(url: URL(string: "ws://192.168.1.227:8000/ws")!) //ws or wss for websockets with startscream.
+        let wsURL = URL(string: AppConfig.wsURL)!
+//        var request = URLRequest(url: URL(string: "ws://192.168.1.227:8000/ws")!) //ws or wss for websockets with startscream.
+        var request = URLRequest(url: wsURL)
         request.timeoutInterval = 5
         socket = WebSocket(request: request)
         socket.delegate = self

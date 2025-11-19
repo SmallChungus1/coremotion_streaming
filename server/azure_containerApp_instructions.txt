@@ -1,0 +1,21 @@
+step 1 build docker image of fastapi websocket server and push to docker hub:
+
+cd <dir containing dockerfile>
+docker build --platform linux/amd64 -t <image name>:<tag name>. (note: need --paltform linux/amd64 flag if building fro m series mac)
+docker tag <image name>:<tag name> <docker username>/<image name>:<tag name>
+docker push <docker username>/<image name>:<tag name> (note may need to docker login first)
+
+image name: ios_stream_websocket
+tag name: v1.0
+
+step 2 create azure container app env:
+
+az containerapp env create --name coremotion-server-env --resource-group cse5114_rg --location westus2
+
+step 3 push image from docker hub to container app:
+
+az containerapp create --name ios-stream-server --resource-group cse5114_rg --environment coremotion-server-env --image hansonli/ios_stream_websocket --target-port 8000 --ingress external
+
+step 4: need to set env vars for the following:
+
+

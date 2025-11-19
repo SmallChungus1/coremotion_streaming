@@ -4,15 +4,32 @@ from fastapi.templating import Jinja2Templates
 import json
 from kafka import KafkaProducer
 from contextlib import asynccontextmanager
+from dotenv import load_dotenv
+import os
+import certifi
 
 
-kafka_host_addr = "localhost:9092"
-kafka_topic = "ios_local_stream"
+load_dotenv()
+
+# kafka_host_addr = "localhost:9092"
+kafka_topic = os.getenv("event-hub-topic")
+
 #Fastapi use kafka-python's Kafka producer to send streamed data from iphone to Kafka Cluster
 #kafka-python set up https://kafka-python.readthedocs.io/en/master/apidoc/KafkaProducer.html | https://kafka-python.readthedocs.io/en/master/
 
 try: 
-    producer = KafkaProducer(bootstrap_servers=kafka_host_addr)
+    # producer = KafkaProducer(bootstrap_servers=kafka_host_addr)
+    producer = KafkaProducer(
+        bootstrap_servers = os.getenv("event-hub-bootstrap-server"),
+        security_protocol = "SASL_SSL",
+        sasl_mechanism = "PLAIN",
+        sasl_plain_username = "$ConnectionString",
+        sasl_plain_password = os.getenv("event-hub-primary-conn-str"),
+        ssl_cafile=certifi.where() #need this for event hub conneciton
+
+    )
+
+    print("Kafka Connection success")
 except Exception as e:
     print(f"Error in initalizing KafkaProducer: {e} continuning without it. WARNING: NOTHING WILL BE STREAMED TO KAFKA")
     producer = None

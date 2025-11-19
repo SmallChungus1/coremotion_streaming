@@ -123,8 +123,8 @@ def load_data(spark_app_name, kafka_bootstrap_server, kafka_topic, schema_path="
 def main():
     load_dotenv()
     spark_app_name = "kafka2snowflake"
-    # kafka_bootstrap_server = "192.168.1.227:9092"
-    kafka_bootstrap_server = "10.232.138.60:9092"
+    kafka_bootstrap_server = "192.168.1.227:9092"
+    # kafka_bootstrap_server = "10.232.138.60:9092"
     kafka_topic = "ios_local_stream"
 
     load_data(spark_app_name=spark_app_name, 

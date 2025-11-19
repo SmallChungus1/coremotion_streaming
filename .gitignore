@@ -2,3 +2,4 @@ __pycache__
 server/coremotion_venv
 .env
 *.pem
+*plist

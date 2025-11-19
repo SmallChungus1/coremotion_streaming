@@ -6,5 +6,7 @@
 	<array>
 		<string>location</string>
 	</array>
+	<key>WS_URL</key>
+	<string>wss://ios-stream-server.ashyglacier-eb2f3bc3.westus2.azurecontainerapps.io/ws</string>
 </dict>
 </plist>
