@@ -8,16 +8,19 @@
 import SwiftUI
 import UIKit
 
-
-
-
 struct ContentView: View {
     @StateObject private var motion = MotionProcess()
     @StateObject private var location = LocationProcess()
     @StateObject private var combinedStream: CombineMotionLocationStream
     
+    //presisted user email field
+    @AppStorage("userEmail") private var userEmail: String = ""
+    var isEmailFieldValid: Bool {
+            !userEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        
 //    let deviceName = UIDevice.current.name //ios16+ Apple masks the actual device name so you get generic ones like 'iPhone' need special permissions
-    let deviceName = String(Int.random(in: 0_000_000_001...9_999_999_999)) //just generate random number with string instead for deviceName to avoid collisions
+//    let deviceName = String(Int.random(in: 0_000_000_001...9_999_999_999)) //just generate random number with string instead for deviceName to avoid collisions
     
     let isoFormatter = ISO8601DateFormatter()
     
@@ -25,10 +28,11 @@ struct ContentView: View {
     
     //for keeping track of user mode
     @State private var userMode: String = "on_foot"
-
+    
+    
     var streamKey: String? {
         guard let start = streamStartTime else { return "noKey" }
-        return "\(deviceName)_\(start)"
+        return "\(userEmail)_\(start)"
     }
     
     // Custom initializer to set up combined stream after motion and location
@@ -42,6 +46,27 @@ struct ContentView: View {
     
     var body: some View {
         ScrollView {
+            
+            //email field
+            VStack(alignment: .leading, spacing: 8) {
+                            Text("User Email (Required for Stream Key)")
+                                .font(.headline)
+                            
+                            TextField("Enter your email address", text: $userEmail)
+                                .textFieldStyle(.roundedBorder)
+                                .keyboardType(.emailAddress)
+                                .autocapitalization(.none)
+                                .disableAutocorrection(true)
+                            
+                            if !isEmailFieldValid {
+                                Text("Please enter an email to start streaming.")
+                                    .foregroundColor(.red)
+                                    .font(.caption)
+                            }
+                        }
+                        .padding(.vertical, 8)
+            
+            //activity mode selection
             VStack(spacing: 24) {
                 
                 VStack(alignment: .leading, spacing: 8) {
@@ -91,14 +116,15 @@ struct ContentView: View {
                             
                             motion.getDeviceMotion()
                             location.requestLocationUpdate()  //note that location streaming will start automatically due
-                        }
+                        }.disabled(!isEmailFieldValid)
                         Button("Stop") {
                             motion.stopGetMotion()
                             location.stopLocationUpdate()
                             
-                        }
+                        }.disabled(!isEmailFieldValid)
                     }
                     .buttonStyle(.bordered)
+                    
                 }
             }
             .padding()

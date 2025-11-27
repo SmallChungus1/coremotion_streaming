@@ -18,4 +18,6 @@ az containerapp create --name ios-stream-server --resource-group cse5114_rg --en
 
 step 4: need to set env vars for the following:
 
+step 5: once container app is deployed, go to it, under "Application" blade, click into "Revision and Replicas" click into the blue link (there should just be 1), locate "containers" line, click on the "show details" next to it, find "Enviornment Variables" section, and link the added scerets as env variables for the container app using the exact name referenced in the socket_test.py files. 
+
 
