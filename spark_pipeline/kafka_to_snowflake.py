@@ -3,6 +3,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType
 from pyspark.sql.functions import col, from_json, window, avg, stddev, min, max, count, last, last_value, mode
 from dotenv import load_dotenv
+import snowflake.connector
 import os
 import json
 import re
@@ -13,6 +14,35 @@ def load_json_schema(path):
         schema_json = json.load(f)
     return StructType.fromJson(schema_json)
 
+def get_streamkeys_from_snowflake(sf_private_key):
+
+    try: 
+        sf_conn = snowflake.connector.connect(
+            account=os.getenv("sfURL").split('.')[0],
+            user=os.getenv("sfUser"),
+            database=os.getenv("sfDatabase"),
+            schema=os.getenv("sfSchema"),
+            warehouse=os.getenv("sfWarehouse"),
+            private_key=sf_private_key
+        )
+    except Exception as e:
+        print(f"Snowflake connection failed in get_streamkeys_from_snowflake: {e}. Exiting")
+        return
+
+    cur = sf_conn.cursor()
+
+    try:
+        cur.execute("SELECT DISTINCT STREAM_KEY FROM COYOTE_DB.IOS_STREAM_SCHEMA.IOS_STREAM ORDER BY STREAM_KEY;")
+        all_rows = cur.fetchall()
+        print(f"unique streamkeys: {all_rows}")
+        return all_rows
+    except Exception as e:
+        print(f"error executing query in get_streamkeys_from_snowflake returning None: {e}")
+        return None
+    finally:
+        cur.close()
+        sf_conn.close()
+    
 #snowflake spark connector only supports spark 3.5.x not pyspark 4
 #to run pipeline use the spark-submit command below with pacakges specificed for kafak conneciton:
 #spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,net.snowflake:spark-snowflake_2.13:3.0.0 kafka_to_snowflake.py
@@ -22,7 +52,9 @@ def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./stream_schema
         private_key_str = f.read()
     private_key_body = re.sub("-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n", "", private_key_str)
     
-    # print(f"SF Private Key: {private_key_body}")
+    existing_stream_keys = get_streamkeys_from_snowflake(sf_private_key=private_key_body)
+    existing_stream_keys = [tup[0] for tup in existing_stream_keys]
+    # # print(f"SF Private Key: {private_key_body}")
 
     snowflake_options = {
     "sfURL": os.getenv("sfURL"),
@@ -64,6 +96,8 @@ def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./stream_schema
         .select("json.*", "kafka_key", "kafka_timestamp", "offset") #select all field from the json field which contains our streamed data
     )
 
+    #de-duplicate dataframe by removing rows with existing stream_key values
+    df_extracted = df_extracted.filter(~col("stream_key").isin(existing_stream_keys))
     df_extracted.show()
     # avg(speed)
     # max(speed)
@@ -119,7 +153,6 @@ def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./stream_schema
         "sample_count"
     )
     )
-
     final_df.show(truncate=False)
 
     final_df.write \
@@ -139,6 +172,8 @@ def load_data(spark_app_name, kafka_bootstrap_server, kafka_topic, schema_path="
         private_key_str = f.read()
     private_key_body = re.sub("-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n", "", private_key_str)
     
+    existing_stream_keys = get_streamkeys_from_snowflake(sf_private_key=private_key_body)
+    existing_stream_keys = [tup[0] for tup in existing_stream_keys]
     # print(f"SF Private Key: {private_key_body}")
 
     snowflake_options = {
@@ -174,6 +209,8 @@ def load_data(spark_app_name, kafka_bootstrap_server, kafka_topic, schema_path="
         .select("json.*", "kafka_key", "kafka_timestamp", "offset") #select all field from the json field which contains our streamed data
     )
 
+    #de-duplicate dataframe by removing rows with existing stream_key values
+    df_extracted = df_extracted.filter(~col("stream_key").isin(existing_stream_keys))
     df_extracted.show()
     # avg(speed)
     # max(speed)
