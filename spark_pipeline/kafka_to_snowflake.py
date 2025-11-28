@@ -1,4 +1,3 @@
-import pyspark
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType
 from pyspark.sql.functions import col, from_json, window, avg, stddev, min, max, count, last, last_value, mode
@@ -15,7 +14,6 @@ def load_json_schema(path):
     return StructType.fromJson(schema_json)
 
 def get_streamkeys_from_snowflake(sf_private_key):
-
     try: 
         sf_conn = snowflake.connector.connect(
             account=os.getenv("sfURL").split('.')[0],
