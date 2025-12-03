@@ -21,6 +21,16 @@
     * note: may need to use ```find / -name "kafka-topics.sh"``` to get location of the kafka-topics.sh file
 * can start streaming data by launching the fastAPI server. You can see the streamed data stored in the kafka topic using ```/opt/kafka/bin/kafka-console-consumer.sh --topic <topic name> --from-beginning --bootstrap-server localhost:9092```
 
+## Kafka to Snowflake via Spark:
+* we use Spark batch jobs orchestrated via airflow to process and push data into snowflake
+
+## Analytics Emails:
+* Airflow orchestrated job to query data for each user (identified by their email), make charts, and send
+* currently set up to send emails from personal gmail accounts
+
+## Airflow:
+* run command ```pip install "apache-airflow[celery]==3.1.3" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.1.3/constraints-3.10.txt"``` to install airflow (or check https://airflow.apache.org/docs/apache-airflow/stable/installation/installing-from-pypi.html for install instructions)
+
 ## Usage:
 * start the fastapi web server first ```uvicorn socket_test:app --host <your ip address> --port 8000```
 * then open the IOS app on your iphone or simulator. Logs from FastAPI should show 'connection accepted'

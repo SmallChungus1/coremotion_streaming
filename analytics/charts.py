@@ -146,9 +146,9 @@ class SnowflakeCharts:
             ax2 = ax1.twinx() #creates the second axis sharing the same X-axis
                         
             ax2.plot(session_pandas_df.index, session_pandas_df['CUMULATIVE_DISTANCE_KM'], 
-                    label='Distance Traveled (km)', linewidth=2.5, color='red')
+                    label='Distance Traveled (m)', linewidth=2.5, color='red')
             
-            ax2.set_ylabel("Cumulative Distance (km)", fontsize=12, color='red')
+            ax2.set_ylabel("Cumulative Distance (m)", fontsize=12, color='red')
             ax2.tick_params(axis='y', labelcolor='red')
                         
             lines, labels = ax1.get_legend_handles_labels()
@@ -202,10 +202,10 @@ class SnowflakeCharts:
 
             #distance travelled chart
             plt.figure(figsize=(15,8))
-            plt.plot(session_pandas_df.index, session_pandas_df['TOTAL_DISTANCE_KM'], label="km traveled")
+            plt.plot(session_pandas_df.index, session_pandas_df['TOTAL_DISTANCE_KM'], label="meters traveled")
             plt.title(f"Distance traveled for week of {session_key.split("_")[-1]}", fontsize=14)
             plt.xlabel("Days", fontsize=12)
-            plt.ylabel("Distance (km)", fontsize=12)
+            plt.ylabel("Distance (m)", fontsize=12)
             plt.legend()
             plt.grid(True, linestyle='--', alpha=0.6)
             plt.xticks(rotation=45, ha='right')
