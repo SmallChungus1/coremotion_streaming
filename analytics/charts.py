@@ -9,9 +9,85 @@ import pandas as pd
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, mode, to_date, from_utc_timestamp, split
 
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+import smtplib
+
+def email_to_user(img_dir="./charts", user_email_list=[]):
+        '''
+        Emails created charts to each unique email address using html templating
+        '''
+
+        for user_email in user_email_list:
+            msg = MIMEMultipart("related")
+            msg["Subject"] = f"Movement Analytics Report {datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}"
+            msg["From"] = os.getenv("emailSender")
+            
+
+            html = """
+            <html>
+            <body>
+                <h2>Your movement analytics</h2>
+                <img src="cid:chart_img">
+            </body>
+            </html>
+            """
+
+            html_parts = ["<html><body><h2>Your Charts</h2>"]
+
+            alt = MIMEMultipart("alternative")
+            msg.attach(alt)
+            msg["To"] = user_email
+        
+            for filename in os.listdir(img_dir):
+                
+                #aggregate content by user emails
+                if not filename.endswith(".png"):
+                    continue
+                
+                #to match user email must use same processing as we did when saving the files
+                if user_email.replace('@', '_at_').replace(':', '-').replace('.', '_') not in filename:
+                    continue
+
+                filepath = os.path.join(img_dir, filename)
+                print(filepath)
+                cid = filename.replace(".", "_")  # unique content-id
+
+                html_parts.append(f'<p><img src="cid:{cid}" style="max-width:600px;"></p>')
+
+                #mime embed image into html
+                with open(filepath, "rb") as f:
+                    img = MIMEImage(f.read(), _subtype="png")
+
+                img.add_header("Content-ID", f"<{cid}>")
+
+                # if SEND_AS_ATTACHMENT:
+                #     # inline HTML + attachment version
+                #     img.add_header("Content-Disposition", "attachment", filename=filename)
+
+                msg.attach(img)
+
+            #build final html after getting the parts, for each user
+            html_parts.append("</body></html>")
+            html = "\n".join(html_parts)
+            alt.attach(MIMEText(html, "html"))
+
+            #smtp gmail auth with google's App Password thing since we cant mfa
+            with smtplib.SMTP("smtp.gmail.com", 587) as server:
+                server.starttls()
+                server.login(os.getenv("emailSender"), os.getenv("gmailAppPass"))
+                server.send_message(msg)
+
+            print(f"Email sent to {user_email}")
+
+        #clean up charts dir after sending all mails
+        for filename in os.listdir(img_dir):
+            os.remove(os.path.join(img_dir, filename))
+
 class SnowflakeCharts:
     def __init__(self):
-        
+        self.user_email_list = [] #set in generate_daily_weekly_charts
         self.spark = SparkSession.builder.appName("stream_analytics").config("spark.driver.memory", "4g").getOrCreate()
         try: 
             with open(os.getenv("rsakey_path"), "r") as f:
@@ -184,9 +260,10 @@ class SnowflakeCharts:
         """
 
         self.sf_cursor.execute(weekly_unique_emails_query)
-        user_email_list = [r[0] for r in self.sf_cursor.fetchall()]
-        print(user_email_list)
-        for cur_user_email in user_email_list:
+        self.user_email_list = [r[0] for r in self.sf_cursor.fetchall()]
+
+        print(self.user_email_list)
+        for cur_user_email in self.user_email_list:
             #sql query for each user
             activity_query_weekly = f"""
             SELECT
@@ -266,7 +343,12 @@ class SnowflakeCharts:
 
         print("Finished generating daily charts.")
 
+        return self.user_email_list
+
+
 if __name__ == "__main__":
     load_dotenv()
     snoflakeChartObj = SnowflakeCharts()
-    snoflakeChartObj.generate_daily_weekly_charts(cur_date="2025-11-26")
+    user_email_list = snoflakeChartObj.generate_daily_weekly_charts(cur_date="2025-12-02")
+    print(user_email_list)
+    email_to_user(user_email_list=user_email_list)
