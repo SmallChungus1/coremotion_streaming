@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import pandas as pd
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lit, mode, to_date, from_utc_timestamp, split
-
+import seaborn as sns
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -34,7 +34,8 @@ def email_to_user(img_dir="./charts", user_email_list=[]):
             </html>
             """
 
-            html_parts = ["<html><body><h2>Your Charts</h2>"]
+            daily_html_parts  = ["<h2>Your Daily Report for All Sessions</h2>"]
+            weekly_html_parts = ["<h2>Your Weekly Overview</h2>"]
 
             alt = MIMEMultipart("alternative")
             msg.attach(alt)
@@ -54,7 +55,14 @@ def email_to_user(img_dir="./charts", user_email_list=[]):
                 print(filepath)
                 cid = filename.replace(".", "_")  # unique content-id
 
-                html_parts.append(f'<p><img src="cid:{cid}" style="max-width:600px;"></p>')
+                if "_daily_" in filename:
+                    daily_html_parts.append(
+                        f'<p><img src="cid:{cid}" style="max-width:600px;"></p>'
+                    )
+                else:
+                    weekly_html_parts.append(
+                        f'<p><img src="cid:{cid}" style="max-width:600px;"></p>'
+                    )
 
                 #mime embed image into html
                 with open(filepath, "rb") as f:
@@ -69,9 +77,11 @@ def email_to_user(img_dir="./charts", user_email_list=[]):
                 msg.attach(img)
 
             #build final html after getting the parts, for each user
-            html_parts.append("</body></html>")
-            html = "\n".join(html_parts)
-            alt.attach(MIMEText(html, "html"))
+            daily_html_parts.append("<br>")
+            weekly_html_parts.append("</body></html>")
+            final_html = "<html><body>" + "\n".join(daily_html_parts + weekly_html_parts) + "</html>"
+
+            alt.attach(MIMEText(final_html, "html"))
 
             #smtp gmail auth with google's App Password thing since we cant mfa
             with smtplib.SMTP("smtp.gmail.com", 587) as server:
@@ -107,7 +117,7 @@ class SnowflakeCharts:
         except Exception as e:
             raise RuntimeError(f"Snowflake connection failed in get_streamkeys_from_snowflake: {e} Exiting")
 
-    def graph_charts(self, time_mode, session_pandas_df, session_key: str, output_dir="./charts"):
+    def graph_charts(self, time_mode, session_pandas_df, session_key: str, weekly_attitude_df=None, output_dir="./charts"):
         # func ow generalized to take the data it needs (a Pandas df) no longer needs to deal with Spark or unique keys list iteration.
         
         x_axis_col = "WINDOW_END" if time_mode == "daily" else "SESSION_DATE"
@@ -125,6 +135,10 @@ class SnowflakeCharts:
             
         session_pandas_df[x_axis_col] = pd.to_datetime(session_pandas_df[x_axis_col])
         session_pandas_df = session_pandas_df.set_index(x_axis_col)
+
+        if weekly_attitude_df is not None:
+            weekly_attitude_df[x_axis_col] = pd.to_datetime(weekly_attitude_df[x_axis_col])
+            weekly_attitude_df = weekly_attitude_df.set_index(x_axis_col)
         
         #dual-axis graph daily metrics that invovles
         if time_mode=="daily":
@@ -200,7 +214,8 @@ class SnowflakeCharts:
             plt.savefig(output_path)
             plt.close()
 
-            #distance travelled chart
+
+            #distance travelled charts
             plt.figure(figsize=(15,8))
             plt.plot(session_pandas_df.index, session_pandas_df['TOTAL_DISTANCE_KM'], label="meters traveled")
             plt.title(f"Distance traveled for week of {session_key.split("_")[-1]}", fontsize=14)
@@ -214,6 +229,47 @@ class SnowflakeCharts:
             output_path = os.path.join(output_dir, f"{filename}_{time_mode}_distances.png")
             plt.savefig(output_path)
             plt.close()
+
+            #violin for yaw/pitch/roll distributions
+            if weekly_attitude_df is not None:
+
+                plt.figure(figsize=(10, 5))
+                sns.violinplot(
+                    data=weekly_attitude_df,
+                    x="USER_MODE",
+                    y="YAW_VARIANCE",
+                    inner=None,          
+                    cut=0,               
+                    bw_method=0.2,              
+                    alpha=0.3,           
+                    linewidth=1,
+                    color="salmon"     
+                )
+
+                plt.title("Yaw Variance (Turning Behavior) by Mode")
+                plt.grid(True, linestyle="--", alpha=0.4)
+                output_path = os.path.join(output_dir, f"{filename}_{time_mode}_yawvardist.png")
+                plt.savefig(output_path)
+                plt.close()
+
+                plt.figure(figsize=(10, 5))
+                sns.violinplot(
+                    data=weekly_attitude_df,
+                    x="USER_MODE",
+                    y="ROLL_VARIANCE",
+                    inner=None,          
+                    cut=0,               
+                    bw_method=0.2,              
+                    alpha=0.3,           
+                    linewidth=1,
+                    color="salmon"     
+                )
+
+                plt.title("Roll Variance by Mode")
+                plt.grid(True, linestyle="--", alpha=0.4)
+                output_path = os.path.join(output_dir, f"{filename}_{time_mode}_rollvardist.png")
+                plt.savefig(output_path)
+                plt.close()
 
         print(f"\nSuccessfully generated chart for {session_key}.")
 
@@ -294,12 +350,49 @@ class SnowflakeCharts:
                 session_date DESC;
             """
             
+            activity_attitude_weekly_query = f"""
+            SELECT
+                SPLIT_PART(t1.STREAM_KEY, '_', 1) AS user_email,
+                CONVERT_TIMEZONE(
+                    'America/Chicago', 
+                    SPLIT_PART(t1.STREAM_KEY, '_', 2)::TIMESTAMP_TZ
+                )::DATE AS session_date,
+
+                t1.user_mode,
+                t1.yaw_variance,
+                t1.pitch_variance,
+                t1.roll_variance
+
+            FROM
+                {os.getenv("tableName")} t1
+                
+            WHERE
+                SPLIT_PART(t1.STREAM_KEY, '_', 1) = '{cur_user_email}'
+                AND
+                CONVERT_TIMEZONE(
+                    'America/Chicago', 
+                    SPLIT_PART(t1.STREAM_KEY, '_', 2)::TIMESTAMP_TZ
+                )::DATE 
+                    BETWEEN DATEADD(day, -7, '{sql_end_date_str}'::DATE)
+                    AND '{sql_end_date_str}'::DATE
+                
+                AND yaw_variance IS NOT NULL
+                AND pitch_variance IS NOT NULL
+                AND roll_variance IS NOT NULL
+
+            ORDER BY
+                session_date DESC;
+            """
             print("--- WEEKLY AGGREGATION RESULT ---")
+            #get aggregated data first
             self.sf_cursor.execute(activity_query_weekly)
             weekly_res_df = self.sf_cursor.fetch_pandas_all()
             print(weekly_res_df.head(10))
+            #then get variance data for distribution plots
+            self.sf_cursor.execute(activity_attitude_weekly_query)
+            weekly_attitude_df = self.sf_cursor.fetch_pandas_all()
 
-            self.graph_charts("weekly", weekly_res_df, f"{ cur_user_email}_{cur_date}")
+            self.graph_charts("weekly", weekly_res_df, f"{ cur_user_email}_{cur_date}", weekly_attitude_df)
 
         ### Daily graph generation ###
         
