@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 from dotenv import load_dotenv
 import os
 
@@ -36,17 +36,17 @@ with DAG(
     start_date=datetime(2025, 11, 1, tzinfo=cst_tz), #set tz to cst
     catchup=False,
 ) as dag:
-    spark_ingest = SparkSubmitOperator(
-        task_id="kafka_to_snowflake_spark",
-        application=SPARK_APP,
-        name="kafka2snowflake",
-        packages="org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,net.snowflake:spark-snowflake_2.13:3.0.0",
-        env_vars={
-            "ANALYTICS_ENV": ANALYTICS_ENV
-        },
-        # IMPORTANT: let it use the local spark-submit on your PATH
-        conn_id=None,
-    )
+    # spark_ingest = SparkSubmitOperator(
+    #     task_id="kafka_to_snowflake_spark",
+    #     application=SPARK_APP,
+    #     name="kafka2snowflake",
+    #     packages="org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,net.snowflake:spark-snowflake_2.13:3.0.0",
+    #     env_vars={
+    #         "ANALYTICS_ENV": ANALYTICS_ENV
+    #     },
+    #     # IMPORTANT: let it use the local spark-submit on your PATH
+    #     conn_id=None,
+    # )
 
     send_email = PythonOperator(
         task_id="gen_charts_and_send_emails",
@@ -57,4 +57,4 @@ with DAG(
         },
     )
 
-    spark_ingest >> send_email
+    send_email

@@ -242,7 +242,7 @@ def load_data(spark_app_name, kafka_bootstrap_server, kafka_topic, schema_path="
     ).join(df_extracted.select(
         col("stream_key"),
         col("user_mode")
-    ),
+    ).dropDuplicates(["stream_key"]),
     on="stream_key",
     how="inner")
 
