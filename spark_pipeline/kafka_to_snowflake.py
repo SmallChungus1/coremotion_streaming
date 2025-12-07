@@ -6,7 +6,10 @@ import snowflake.connector
 import os
 import json
 import re
+import time
+from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parent #need to get base dir for the sf_rsa_key file, since airflow can't find the relative path
 
 def load_json_schema(path):
     with open(path, "r") as f:
@@ -43,10 +46,11 @@ def get_streamkeys_from_snowflake(sf_private_key):
     
 #snowflake spark connector only supports spark 3.5.x not pyspark 4
 #to run pipeline use the spark-submit command below with pacakges specificed for kafak conneciton:
-#spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,net.snowflake:spark-snowflake_2.13:3.0.0 kafka_to_snowflake.py
+#spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,net.snowflake:spark-snowflake_2.13:3.0.0 ./spark_pipeline/kafka_to_snowflake.py
 
-def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./stream_schema.json"):
-    with open(os.getenv("rsakey_path"), "r") as f:
+def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./spark_pipeline/stream_schema.json"):
+    full_rsakey_path = BASE_DIR / os.getenv("rsakey_path") #full path, needed for airflow to find sf pem file
+    with open(full_rsakey_path, "r") as f:
         private_key_str = f.read()
     private_key_body = re.sub("-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n", "", private_key_str)
     
@@ -63,6 +67,10 @@ def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./stream_schema
     "pem_private_key": private_key_body
     }
     spark = SparkSession.builder.appName(spark_app_name).getOrCreate()
+
+    #start timer
+    start = time.perf_counter()
+
     stream_schema = load_json_schema(schema_path)
 
     #eventhub conneciton variables
@@ -160,11 +168,15 @@ def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./stream_schema
     .mode("append") \
     .save()
 
+    #end timer
+    end = time.perf_counter()
     spark.stop() 
+    print(f"Pipeline time: {end - start:.2f}s")
 
 
 
-def load_data(spark_app_name, kafka_bootstrap_server, kafka_topic, schema_path="./stream_schema.json"):
+
+def load_data_kafka(spark_app_name, kafka_bootstrap_server, kafka_topic, schema_path="./stream_schema.json"):
     
     with open(os.getenv("rsakey_path"), "r") as f:
         private_key_str = f.read()
@@ -282,11 +294,11 @@ def main():
     spark_app_name = "kafka2snowflake"
 
     ###local kafka###
-    # kafka_bootstrap_server = "192.168.1.227:9092"
-    # # kafka_bootstrap_server = "10.232.138.60:9092"
+    # kafka_bootstrap_server = "{ip_add}:9092"
+    # # kafka_bootstrap_server = "{ip_add}:9092"
     # kafka_topic = "ios_local_stream"
 
-    # load_data(spark_app_name=spark_app_name, 
+    # load_data_kafka(spark_app_name=spark_app_name, 
     #           kafka_bootstrap_server=kafka_bootstrap_server, 
     #           kafka_topic=kafka_topic)
 
@@ -294,7 +306,7 @@ def main():
     ###eventhub based kafak###
     load_data_eventhub(spark_app_name=spark_app_name, 
               kafka_topic=os.getenv("event-hub-topic"), 
-              schema_path=os.path.abspath("./stream_schema.json"))
+              schema_path=os.path.abspath("./spark_pipeline/stream_schema.json"))
     
 if __name__ == "__main__":
     main()

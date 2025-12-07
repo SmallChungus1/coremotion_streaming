@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 import snowflake.connector
 import os
@@ -13,11 +14,18 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 import smtplib
+from pathlib import Path
 
-def email_to_user(img_dir="./charts", user_email_list=[]):
+matplotlib.use('Agg') #use agg backend to prevent rendering UI
+
+BASE_DIR = Path(__file__).resolve().parent #need to get base dir for the sf_rsa_key file, since airflow can't find the relative path
+
+def email_to_user(img_dir="charts", user_email_list=[]):
         '''
         Emails created charts to each unique email address using html templating
         '''
+        img_dir = BASE_DIR / img_dir #full path for airflow
+        print(f"img_dir: {img_dir}")
 
         for user_email in user_email_list:
             msg = MIMEMultipart("related")
@@ -100,7 +108,9 @@ class SnowflakeCharts:
         self.user_email_list = [] #set in generate_daily_weekly_charts
         self.spark = SparkSession.builder.appName("stream_analytics").config("spark.driver.memory", "4g").getOrCreate()
         try: 
-            with open(os.getenv("rsakey_path"), "r") as f:
+            full_rsakey_path = BASE_DIR / os.getenv("rsakey_path") #full path, needed for airflow to find sf pem file
+
+            with open(full_rsakey_path, "r") as f:
                 private_key_str = f.read()
             private_key_body = re.sub("-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n", "", private_key_str)
             
@@ -117,9 +127,12 @@ class SnowflakeCharts:
         except Exception as e:
             raise RuntimeError(f"Snowflake connection failed in get_streamkeys_from_snowflake: {e} Exiting")
 
-    def graph_charts(self, time_mode, session_pandas_df, session_key: str, weekly_attitude_df=None, output_dir="./charts"):
+    def graph_charts(self, time_mode, session_pandas_df, session_key: str, weekly_attitude_df=None, output_dir="charts"):
         # func ow generalized to take the data it needs (a Pandas df) no longer needs to deal with Spark or unique keys list iteration.
         
+        output_dir = BASE_DIR / output_dir #full path for airflow
+        print(f"output_dir: {output_dir}")
+
         x_axis_col = "WINDOW_END" if time_mode == "daily" else "SESSION_DATE"
         plot_cols = ["WINDOW_END", "AVG_SPEED", "MAX_SPEED", "ACCELERATION"]
         filename = session_key.replace('@', '_at_').replace(':', '-').replace('.', '_')

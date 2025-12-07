@@ -12,7 +12,6 @@ from analytics.charts import SnowflakeCharts, email_to_user
 from datetime import date
 import pendulum
 
-
 cst_tz = pendulum.timezone("America/Chicago")
 
 PROJECT_ROOT = "/Users/hansonli/Desktop/coremotion_streaming"
@@ -36,25 +35,25 @@ with DAG(
     start_date=datetime(2025, 11, 1, tzinfo=cst_tz), #set tz to cst
     catchup=False,
 ) as dag:
-    # spark_ingest = SparkSubmitOperator(
-    #     task_id="kafka_to_snowflake_spark",
-    #     application=SPARK_APP,
-    #     name="kafka2snowflake",
-    #     packages="org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,net.snowflake:spark-snowflake_2.13:3.0.0",
-    #     env_vars={
-    #         "ANALYTICS_ENV": ANALYTICS_ENV
-    #     },
-    #     # IMPORTANT: let it use the local spark-submit on your PATH
-    #     conn_id=None,
-    # )
+    spark_ingest = SparkSubmitOperator(
+        task_id="kafka_to_snowflake_spark",
+        application=SPARK_APP,
+        name="kafka2snowflake",
+        packages="org.apache.spark:spark-sql-kafka-0-10_2.13:3.5.1,net.snowflake:spark-snowflake_2.13:3.0.0",
+        env_vars={
+            "ANALYTICS_ENV": ANALYTICS_ENV
+        },
+        conn_id="spark_local", #Important: need to go to airflow dashboard -> admin -> connections -> add new connections ->  
+    )
 
     send_email = PythonOperator(
         task_id="gen_charts_and_send_emails",
         python_callable=run_analytics,
         op_kwargs={
-            "cur_date": date.today().strftime("%Y-%m-%d"),
+            # "cur_date": date.today().strftime("%Y-%m-%d"),
+            'cur_date': '2025-12-02',
             "analytics_env_path": ANALYTICS_ENV
         },
     )
 
-    send_email
+    spark_ingest >> send_email
