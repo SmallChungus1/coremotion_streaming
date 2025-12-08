@@ -20,14 +20,14 @@ matplotlib.use('Agg') #use agg backend to prevent rendering UI
 
 BASE_DIR = Path(__file__).resolve().parent #need to get base dir for the sf_rsa_key file, since airflow can't find the relative path
 
-def email_to_user(img_dir="charts", user_email_list=[], hard_braking_count=None, sharp_turn_count=None, rapid_accl_count=None):
+def email_to_user(img_dir="charts", user_email_list=[], hard_braking_count=[], sharp_turn_count=[], rapid_accl_count=[], total_drive_count=[]):
         '''
         Emails created charts to each unique email address using html templating
         '''
         img_dir = BASE_DIR / img_dir #full path for airflow
         print(f"img_dir: {img_dir}")
 
-        for user_email in user_email_list:
+        for user_email, cur_hard_braking_count, cur_sharp_turn_count, cur_rapid_accl_count, cur_total_drive_count in zip(user_email_list, hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count):
             msg = MIMEMultipart("related")
             msg["Subject"] = f"Movement Analytics Report {datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}"
             msg["From"] = os.getenv("emailSender")
@@ -44,7 +44,8 @@ def email_to_user(img_dir="charts", user_email_list=[], hard_braking_count=None,
 
             daily_html_parts  = ["<h2>Your Daily Report for All Sessions</h2>"]
             weekly_html_parts = ["<h2>Your Weekly Overview</h2>"]
-            weekly_html_parts.append(f'<h4>Weekly driving anamoly detection report: # of hard turns: {hard_braking_count} | # of sharp turns: {sharp_turn_count} | # of rapid accelerations: {rapid_accl_count} </h4>')
+            weekly_html_parts.append(f'<h4>Weekly driving anamoly detection report: Out of {cur_total_drive_count} total drives, you had: # {cur_hard_braking_count} of hard turns | # {cur_sharp_turn_count} of sharp turns | #  {cur_rapid_accl_count} of rapid accelerations </h4>')
+            
 
             alt = MIMEMultipart("alternative")
             msg.attach(alt)
@@ -450,12 +451,26 @@ class SnowflakeCharts:
 
         print("Finished generating daily charts.")
 
-        hard_breaking_count, sharp_turn_count, rapid_accl_count = self.driving_anomaly_detect(sql_end_date_str, self.user_email_list)
-        return self.user_email_list, hard_breaking_count, sharp_turn_count, rapid_accl_count
+        hard_breaking_count, sharp_turn_count, rapid_accl_count, total_drive_count = self.driving_anomaly_detect(sql_end_date_str, self.user_email_list)
+        return self.user_email_list, hard_breaking_count, sharp_turn_count, rapid_accl_count, total_drive_count
 
     #to be used inside generate_daily_weekly_charts
     def driving_anomaly_detect(self, sql_end_date_str, user_email_list):
+        hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count = [], [], [], []
+        
         for cur_user_email in user_email_list:
+
+            drive_count_qry = f"""
+            SELECT COUNT(DISTINCT STREAM_KEY),
+            FROM {os.getenv("tableName")} t1
+            WHERE
+                USER_MODE = 'driving'
+                AND 
+                STREAM_KEY LIKE '{cur_user_email}%'
+                AND
+                CONVERT_TIMEZONE('America/Chicago', SPLIT_PART(t1.STREAM_KEY, '_', 2)::TIMESTAMP_TZ)::DATE
+                BETWEEN DATEADD(day, -7, '{sql_end_date_str}'::DATE) AND '{sql_end_date_str}'::DATE;
+            """
             hard_braking_qry = f"""
             SELECT COUNT(*),
             FROM {os.getenv("tableName")} t1
@@ -492,21 +507,24 @@ class SnowflakeCharts:
                 BETWEEN DATEADD(day, -7, '{sql_end_date_str}'::DATE) AND '{sql_end_date_str}'::DATE;
             """
 
-            hard_braking_count = self.sf_cursor.execute(hard_braking_qry).fetchone()[0]
-            sharp_turn_count = self.sf_cursor.execute(sharp_turn_qry).fetchone()[0]
-            rapid_accl_count = self.sf_cursor.execute(rapid_accl_qry).fetchone()[0]
+            total_drive_count.append(self.sf_cursor.execute(drive_count_qry).fetchone()[0])
+            hard_braking_count.append(self.sf_cursor.execute(hard_braking_qry).fetchone()[0])
+            sharp_turn_count.append(self.sf_cursor.execute(sharp_turn_qry).fetchone()[0])
+            rapid_accl_count.append(self.sf_cursor.execute(rapid_accl_qry).fetchone()[0])
 
-            print(f"hard braking count: {hard_braking_count}, {sharp_turn_count}, {rapid_accl_count}")
+        return hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count
+
+    def driving_risk_inference(self, sql_end_date_str, user_email_list):
+        pass
         
-        return hard_braking_count, sharp_turn_count, rapid_accl_count
-
 
 if __name__ == "__main__":
     load_dotenv()
     snoflakeChartObj = SnowflakeCharts()
-    user_email_list, hard_braking_count, sharp_turn_count, rapid_accl_count = snoflakeChartObj.generate_daily_weekly_charts(cur_date="2025-12-08")
+    user_email_list, hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count = snoflakeChartObj.generate_daily_weekly_charts(cur_date="2025-12-08")
     print(user_email_list)
     email_to_user(user_email_list=user_email_list, 
                   hard_braking_count=hard_braking_count, 
                   sharp_turn_count=sharp_turn_count, 
-                  rapid_accl_count=rapid_accl_count)
+                  rapid_accl_count=rapid_accl_count,
+                  total_drive_count=total_drive_count)
