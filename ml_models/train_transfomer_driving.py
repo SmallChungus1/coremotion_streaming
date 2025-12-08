@@ -104,108 +104,112 @@ class DrivingTransformer(nn.Module):
         return self.mlp_head(pooled)
 
 ### TRAININ SETUP
+def train_model():
+    synth_dataset = DrivingDataset(BASE_DIR / 'synth_labeled_data.csv')
+    real_dataset = DrivingDataset(BASE_DIR / 'labeled_real_data.csv')
 
-synth_dataset = DrivingDataset(BASE_DIR / 'synth_labeled_data.csv')
-real_dataset = DrivingDataset(BASE_DIR / 'labeled_real_data.csv')
-
-dataset = ConcatDataset([synth_dataset, real_dataset])
-
-
-train_size = int(0.8 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
-
-train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=collate_fn)
-val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False, collate_fn=collate_fn)
+    dataset = ConcatDataset([synth_dataset, real_dataset])
 
 
-model = DrivingTransformer().to(device)
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
 
-#Trai/val loops
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False, collate_fn=collate_fn)
 
-num_epochs = 100
-train_losses = []
-val_losses = []
-best_val_loss = float('inf')
-early_stop_patience = 15
 
-print(f"Starting training for {num_epochs} epochs...")
+    model = DrivingTransformer().to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-time_start = time.perf_counter()
-for epoch in range(num_epochs):
-    model.train()
-    running_train_loss = 0.0
-    
-    for inputs, labels, mask in train_loader:
-        inputs, labels, mask = inputs.to(device), labels.to(device), mask.to(device)
+    #Trai/val loops
+
+    num_epochs = 100
+    train_losses = []
+    val_losses = []
+    best_val_loss = float('inf')
+    early_stop_patience = 15
+
+    print(f"Starting training for {num_epochs} epochs...")
+
+    time_start = time.perf_counter()
+    for epoch in range(num_epochs):
+        model.train()
+        running_train_loss = 0.0
         
-        optimizer.zero_grad()
-        outputs = model(inputs, src_key_padding_mask=mask)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-        
-        running_train_loss += loss.item() * inputs.size(0)
-    
-    epoch_train_loss = running_train_loss / len(train_dataset)
-    train_losses.append(epoch_train_loss)
-    
-    model.eval()
-    running_val_loss = 0.0
-    correct = 0
-    total = 0
-    
-    with torch.no_grad():
-        for inputs, labels, mask in val_loader:
+        for inputs, labels, mask in train_loader:
             inputs, labels, mask = inputs.to(device), labels.to(device), mask.to(device)
             
+            optimizer.zero_grad()
             outputs = model(inputs, src_key_padding_mask=mask)
             loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
             
-            running_val_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+            running_train_loss += loss.item() * inputs.size(0)
+        
+        epoch_train_loss = running_train_loss / len(train_dataset)
+        train_losses.append(epoch_train_loss)
+        
+        model.eval()
+        running_val_loss = 0.0
+        correct = 0
+        total = 0
+        
+        with torch.no_grad():
+            for inputs, labels, mask in val_loader:
+                inputs, labels, mask = inputs.to(device), labels.to(device), mask.to(device)
+                
+                outputs = model(inputs, src_key_padding_mask=mask)
+                loss = criterion(outputs, labels)
+                
+                running_val_loss += loss.item() * inputs.size(0)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-    epoch_val_loss = running_val_loss / len(val_dataset)
-    val_losses.append(epoch_val_loss)
-    val_acc = 100 * correct / total
+        epoch_val_loss = running_val_loss / len(val_dataset)
+        val_losses.append(epoch_val_loss)
+        val_acc = 100 * correct / total
 
-    if epoch_val_loss < best_val_loss:
-        best_val_loss = epoch_val_loss
-        no_improvment_tally = 0
-        #clear old weights first, then save new one
-        for f_name in os.listdir(BASE_DIR):
-            if ".pth" in f_name:
-                os.remove(BASE_DIR / f_name)
+        if epoch_val_loss < best_val_loss:
+            best_val_loss = epoch_val_loss
+            no_improvment_tally = 0
+            #clear old weights first, then save new one
+            for f_name in os.listdir(BASE_DIR):
+                if ".pth" in f_name:
+                    os.remove(BASE_DIR / f_name)
 
-        torch.save(model.state_dict(), BASE_DIR / f"transformer_drive_cls_ep{epoch}.pth")
-    else: 
-        no_improvment_tally += 1
-    
-    print(f"Epoch {epoch+1:02d}/{num_epochs} | Train Loss: {epoch_train_loss:.4f} | Val Loss: {epoch_val_loss:.4f} | Val Acc: {val_acc:.2f}%")
+            torch.save(model.state_dict(), BASE_DIR / f"transformer_drive_cls_ep{epoch}.pth")
+        else: 
+            no_improvment_tally += 1
+        
+        print(f"Epoch {epoch+1:02d}/{num_epochs} | Train Loss: {epoch_train_loss:.4f} | Val Loss: {epoch_val_loss:.4f} | Val Acc: {val_acc:.2f}%")
 
-    if no_improvment_tally > early_stop_patience:
-        print(f"Training early stopped at epoch {epoch}")
-        break
-
-
-
-time_end = time.perf_counter()
-
-print(f"Total training time: {time_end-time_start:.2f} seconds")
+        if no_improvment_tally > early_stop_patience:
+            print(f"Training early stopped at epoch {epoch}")
+            break
 
 
-#train/val chart
-plt.figure(figsize=(10, 6))
-plt.plot(train_losses, label='Training Loss', marker='o')
-plt.plot(val_losses, label='Validation Loss', marker='o')
-plt.title('Transformer Training Progress')
-plt.xlabel('Epochs')
-plt.ylabel('Cross Entropy Loss')
-plt.legend()
-plt.grid(True)
-plt.savefig(BASE_DIR / 'training_loss_chart.png')
-print(f"Chart saved to {BASE_DIR / 'training_loss_chart.png'}")
+
+    time_end = time.perf_counter()
+
+    print(f"Total training time: {time_end-time_start:.2f} seconds")
+
+
+    #train/val chart
+    plt.figure(figsize=(10, 6))
+    plt.plot(train_losses, label='Training Loss', marker='o')
+    plt.plot(val_losses, label='Validation Loss', marker='o')
+    plt.title('Transformer Training Progress')
+    plt.xlabel('Epochs')
+    plt.ylabel('Cross Entropy Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(BASE_DIR / 'training_loss_chart.png')
+    print(f"Chart saved to {BASE_DIR / 'training_loss_chart.png'}")
+
+
+if __name__ == "__main__":
+    train_model()

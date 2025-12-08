@@ -15,35 +15,34 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 import smtplib
 from pathlib import Path
+import torch
+from torch.utils.data import DataLoader
+import sys
+sys.path.append("/Users/hansonli/Desktop/coremotion_streaming")
+from ml_models.train_transfomer_driving import DrivingTransformer, DrivingDataset, collate_fn
+import glob
 
 matplotlib.use('Agg') #use agg backend to prevent rendering UI
 
 BASE_DIR = Path(__file__).resolve().parent #need to get base dir for the sf_rsa_key file, since airflow can't find the relative path
 
-def email_to_user(img_dir="charts", user_email_list=[], hard_braking_count=[], sharp_turn_count=[], rapid_accl_count=[], total_drive_count=[]):
+def email_to_user(img_dir="charts", user_email_list=[], hard_braking_count=[], sharp_turn_count=[], rapid_accl_count=[], total_drive_count=[], risk_drive_sessions=[]):
         '''
         Emails created charts to each unique email address using html templating
         '''
         img_dir = BASE_DIR / img_dir #full path for airflow
         print(f"img_dir: {img_dir}")
 
-        for user_email, cur_hard_braking_count, cur_sharp_turn_count, cur_rapid_accl_count, cur_total_drive_count in zip(user_email_list, hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count):
+        for user_email, cur_hard_braking_count, cur_sharp_turn_count, cur_rapid_accl_count, cur_total_drive_count, cur_risky_drive_sessions_count in zip(user_email_list, hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count, risk_drive_sessions):
             msg = MIMEMultipart("related")
             msg["Subject"] = f"Movement Analytics Report {datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}"
             msg["From"] = os.getenv("emailSender")
             
 
-            html = """
-            <html>
-            <body>
-                <h2>Your movement analytics</h2>
-                <img src="cid:chart_img">
-            </body>
-            </html>
-            """
-
             daily_html_parts  = ["<h2>Your Daily Report for All Sessions</h2>"]
             weekly_html_parts = ["<h2>Your Weekly Overview</h2>"]
+            weekly_html_parts.append(f'<h4>ML Analytics: Out of {cur_total_drive_count} driving sessions this week, our model flagged {cur_risky_drive_sessions_count} sessions as Risky </h4><br><br>')
+
             weekly_html_parts.append(f'<h4>Weekly driving anamoly detection report: Out of {cur_total_drive_count} total drives, you had: # {cur_hard_braking_count} of hard turns | # {cur_sharp_turn_count} of sharp turns | #  {cur_rapid_accl_count} of rapid accelerations </h4>')
             
 
@@ -452,7 +451,9 @@ class SnowflakeCharts:
         print("Finished generating daily charts.")
 
         hard_breaking_count, sharp_turn_count, rapid_accl_count, total_drive_count = self.driving_anomaly_detect(sql_end_date_str, self.user_email_list)
-        return self.user_email_list, hard_breaking_count, sharp_turn_count, rapid_accl_count, total_drive_count
+        risk_drive_sessions = self.driving_risk_inference(sql_end_date_str, self.user_email_list)
+        
+        return self.user_email_list, hard_breaking_count, sharp_turn_count, rapid_accl_count, total_drive_count, risk_drive_sessions
 
     #to be used inside generate_daily_weekly_charts
     def driving_anomaly_detect(self, sql_end_date_str, user_email_list):
@@ -512,19 +513,98 @@ class SnowflakeCharts:
             sharp_turn_count.append(self.sf_cursor.execute(sharp_turn_qry).fetchone()[0])
             rapid_accl_count.append(self.sf_cursor.execute(rapid_accl_qry).fetchone()[0])
 
+
         return hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count
 
     def driving_risk_inference(self, sql_end_date_str, user_email_list):
-        pass
+            print("\n--- STARTING AI RISK INFERENCE ---")
+            
+            device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+            print(f"Using device: {device}")
+            
+            model = DrivingTransformer(input_dim=8, num_classes=2).to(device)
+            
+            model_path = next(BASE_DIR.glob("*.pth"), None)
+            if model_path is not None:
+                model.load_state_dict(torch.load(model_path, map_location=device))
+                print("Loaded trained model weights.")
+            else:
+                print("Warning: No model weights found. Using untrained initialized model.")
+                
+            model.eval()
+            
+            ai_risk_counts = []
+            
+            for cur_user_email in user_email_list:
+                feature_qry = f"""
+                    SELECT 
+                        STREAM_KEY,
+                        AVG_SPEED, MAX_SPEED, MIN_SPEED, ACCELERATION, 
+                        SPEED_VARIANCE, YAW_VARIANCE, PITCH_VARIANCE, ROLL_VARIANCE
+                    FROM {os.getenv('tableName')} t1
+                    WHERE
+                        USER_MODE = 'driving'
+                        AND
+                        STREAM_KEY LIKE '{cur_user_email}%'
+                        AND
+                        CONVERT_TIMEZONE('America/Chicago', SPLIT_PART(t1.STREAM_KEY, '_', 2)::TIMESTAMP_TZ)::DATE
+                        BETWEEN DATEADD(day, -7, '{sql_end_date_str}'::DATE) AND '{sql_end_date_str}'::DATE
+                    ORDER BY STREAM_KEY, WINDOW_END;
+                """
+                
+                try:
+                    self.sf_cursor.execute(feature_qry)
+                    df_features = self.sf_cursor.fetch_pandas_all()
+                    
+                    if df_features.empty:
+                        ai_risk_counts.append(0)
+                        continue
+
+                    # DrivingDataset class expects dataframe with 'LABEL', with inference we add dummy ones
+                    df_features['LABEL'] = 0 
+                    
+                    #save to temp CSV because DrivingDataset expects a file path
+                    temp_csv_path = BASE_DIR / f"temp_inference_{cur_user_email}.csv"
+                    df_features.to_csv(temp_csv_path, index=False)
+                    
+                    dataset = DrivingDataset(str(temp_csv_path))
+                    loader = DataLoader(dataset, batch_size=4, shuffle=False, collate_fn=collate_fn)
+                    
+                    risky_sessions = 0
+                    
+                    with torch.no_grad():
+                        for inputs, labels, mask in loader:
+                            inputs = inputs.to(device)
+                            mask = mask.to(device)
+                            
+                            logits = model(inputs, src_key_padding_mask=mask)
+                            
+                            _, predicted = torch.max(logits, 1)
+                            risky_sessions += predicted.sum().item()
+                    
+                    ai_risk_counts.append(risky_sessions)
+                    print(f"User {cur_user_email}: {risky_sessions} risky drives detected.")
+                    
+                    if os.path.exists(temp_csv_path):
+                        os.remove(temp_csv_path)
+                        
+                except Exception as e:
+                    print(f"Error running inference for {cur_user_email}: {e}")
+                    ai_risk_counts.append(0)
+                    
+            return ai_risk_counts
+
+
         
 
 if __name__ == "__main__":
     load_dotenv()
     snoflakeChartObj = SnowflakeCharts()
-    user_email_list, hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count = snoflakeChartObj.generate_daily_weekly_charts(cur_date="2025-12-08")
+    user_email_list, hard_braking_count, sharp_turn_count, rapid_accl_count, total_drive_count, risk_drive_sessions = snoflakeChartObj.generate_daily_weekly_charts(cur_date="2025-12-08")
     print(user_email_list)
     email_to_user(user_email_list=user_email_list, 
                   hard_braking_count=hard_braking_count, 
                   sharp_turn_count=sharp_turn_count, 
                   rapid_accl_count=rapid_accl_count,
-                  total_drive_count=total_drive_count)
+                  total_drive_count=total_drive_count,
+                  risk_drive_sessions=risk_drive_sessions)
