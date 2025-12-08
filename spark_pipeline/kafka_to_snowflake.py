@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent #need to get base dir for the sf_rsa_key file, since airflow can't find the relative path
+ENV_PATH = BASE_DIR / ".env"
 
 def load_json_schema(path):
     with open(path, "r") as f:
@@ -77,6 +78,14 @@ def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./spark_pipelin
     event_hub_bootstrap_server = os.getenv("event-hub-bootstrap-server")
     event_hub_conn_str = os.getenv("event-hub-primary-conn-str")
     
+    #use this for reading kafka from local, but needs kafka_bootstrap_server address
+    # df_raw = spark.read \
+    # .format("kafka") \
+    # .option("kafka.bootstrap.servers", kafka_bootstrap_server) \
+    # .option("subscribe", kafka_topic) \
+    # .option("startingOffsets", "earliest") \
+    # .option("endingOffsets", "latest") \
+    # .load()
 
     #spark read config for eventhub
     df_raw = spark.read \
@@ -174,120 +183,56 @@ def load_data_eventhub(spark_app_name, kafka_topic, schema_path="./spark_pipelin
     print(f"Pipeline time: {end - start:.2f}s")
 
 
+def deduplicate_snowflake_table():
+    load_dotenv(ENV_PATH) #need to load separately since we call this as pythonoperator in spark_email_dag.py
 
+    try: 
+        full_rsakey_path = BASE_DIR / os.getenv("rsakey_path") #full path, needed for airflow to find sf pem file
 
-def load_data_kafka(spark_app_name, kafka_bootstrap_server, kafka_topic, schema_path="./stream_schema.json"):
-    
-    with open(os.getenv("rsakey_path"), "r") as f:
-        private_key_str = f.read()
-    private_key_body = re.sub("-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n", "", private_key_str)
-    
-    existing_stream_keys = get_streamkeys_from_snowflake(sf_private_key=private_key_body)
-    existing_stream_keys = [tup[0] for tup in existing_stream_keys]
-    # print(f"SF Private Key: {private_key_body}")
-
-    snowflake_options = {
-    "sfURL": os.getenv("sfURL"),
-    "sfUser": os.getenv("sfUser"),
-    "sfDatabase": os.getenv("sfDatabase"),
-    "sfSchema": os.getenv("sfSchema"),
-    "sfWarehouse": os.getenv("sfWarehouse"),
-    "pem_private_key": private_key_body
-    }
-
-
-    spark = SparkSession.builder.appName(spark_app_name).getOrCreate()
-
-    stream_schema = load_json_schema(schema_path)
-
-    df_raw = spark.read \
-    .format("kafka") \
-    .option("kafka.bootstrap.servers", kafka_bootstrap_server) \
-    .option("subscribe", kafka_topic) \
-    .option("startingOffsets", "earliest") \
-    .option("endingOffsets", "latest") \
-    .load()
-
-    df_extracted = (
-        df_raw
-        .select(
-            col("key").cast("string").alias("kafka_key"),
-            from_json(col("value").cast("string"), stream_schema).alias("json"), #value field contains the whole json string
-            col("timestamp").alias("kafka_timestamp"),
-            col("offset")
+        with open(full_rsakey_path, "r") as f:
+            private_key_str = f.read()
+        private_key_body = re.sub("-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n", "", private_key_str)
+        
+        sf_conn = snowflake.connector.connect(
+            account=os.getenv("sfURL").split('.')[0],
+            user=os.getenv("sfUser"),
+            database=os.getenv("sfDatabase"),
+            schema=os.getenv("sfSchema"),
+            warehouse=os.getenv("sfWarehouse"),
+            private_key=private_key_body
         )
-        .select("json.*", "kafka_key", "kafka_timestamp", "offset") #select all field from the json field which contains our streamed data
-    )
 
-    #de-duplicate dataframe by removing rows with existing stream_key values
-    df_extracted = df_extracted.filter(~col("stream_key").isin(existing_stream_keys))
-    df_extracted.show()
-    # avg(speed)
-    # max(speed)
-    # variance(speed)
-    # count of speed spikes
-    # acceleration (Δspeed / Δtime)
-    #last long/lat of window
+        sf_cursor = sf_conn.cursor()
 
+    except Exception as e:
+        raise RuntimeError(f"Snowflake connection failed in deduplicate_snowflake_table: {e} Exiting")
+    
+    #This creates a new table replacing the old one, 
+    #keeping only the 1st instance of every group to deduplicate table.
+    
+    sf_dedupe_query = f"""
+        CREATE OR REPLACE TABLE {os.getenv('tableName')} AS
+        SELECT * FROM {os.getenv('tableName')} 
+        QUALIFY ROW_NUMBER() OVER (
+            PARTITION BY 
+                STREAM_KEY, 
+                USER_MODE, 
+                WINDOW_START,
+                WINDOW_END,
+                AVG_SPEED, 
+                YAW_VARIANCE 
+            ORDER BY 
+                WINDOW_END DESC
+        ) = 1;
+    """
 
-    # yaw variance → steering
-    # pitch variance → acceleration/braking
-    # roll variance → phone tilt (distraction level)
+    start = time.perf_counter()
 
-    agg_df = (
-        df_extracted
-        .withColumn("timestamp_ts", col("cur_time").cast("timestamp"))
-        .groupBy(window("timestamp_ts", "10 seconds"), "stream_key")
-        .agg(
-            avg("speed").alias("avg_speed"),
-            max("speed").alias("max_speed"),
-            min("speed").alias("min_speed"),
-            stddev("speed").alias("speed_variance"),
-            stddev("yaw").alias("yaw_variance"),
-            stddev("pitch").alias("pitch_variance"),
-            stddev("roll").alias("roll_variance"),
-            last("lon").alias("last_longitude"),
-            last("lat").alias("last_latitude"),
-            count("*").alias("sample_count")
-        )
-        .withColumn("acceleration", ((col("max_speed") - col("min_speed")) / 10.0))
-    ).join(df_extracted.select(
-        col("stream_key"),
-        col("user_mode")
-    ).dropDuplicates(["stream_key"]),
-    on="stream_key",
-    how="inner")
+    sf_cursor.execute(sf_dedupe_query)
 
-    final_df = (
-        agg_df.select(
-        "stream_key",
-        "user_mode",
-        col("window.start").alias("window_start"),
-        col("window.end").alias("window_end"),
-        "avg_speed",
-        "max_speed",
-        "min_speed",
-        "acceleration",
-        "speed_variance",
-        "yaw_variance",
-        "pitch_variance",
-        "roll_variance",
-        "last_longitude",
-        "last_latitude",
-        "sample_count"
-    )
-    )
+    end = time.perf_counter()
 
-    final_df.show(truncate=False)
-
-    final_df.write \
-    .format("snowflake") \
-    .options(**snowflake_options) \
-    .option("dbtable", os.getenv("tableName")) \
-    .mode("append") \
-    .save()
-
-    spark.stop()    
+    print(f"Sucessfully de-duped snowflake table in {end-start:.2f} seconds")
 
 def main():
     load_dotenv()

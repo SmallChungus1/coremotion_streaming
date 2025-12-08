@@ -9,6 +9,7 @@ import sys
 #add the analytics folder path for airflow
 sys.path.append("/Users/hansonli/Desktop/coremotion_streaming")
 from analytics.charts import SnowflakeCharts, email_to_user
+from spark_pipeline.kafka_to_snowflake import deduplicate_snowflake_table
 from datetime import date
 import pendulum
 
@@ -46,14 +47,18 @@ with DAG(
         conn_id="spark_local", #Important: need to go to airflow dashboard -> admin -> connections -> add new connections ->  
     )
 
+    dedupe_table = PythonOperator(
+        task_id="dedupe_snowflake_table",
+        python_callable=deduplicate_snowflake_table
+    )
+
     send_email = PythonOperator(
         task_id="gen_charts_and_send_emails",
         python_callable=run_analytics,
         op_kwargs={
-            # "cur_date": date.today().strftime("%Y-%m-%d"),
-            'cur_date': '2025-12-02',
+            "cur_date": date.today().strftime("%Y-%m-%d"),
             "analytics_env_path": ANALYTICS_ENV
         },
     )
 
-    spark_ingest >> send_email
+    spark_ingest >> dedupe_table >> send_email
