@@ -7,7 +7,7 @@
 
 ## FastAPI/Websocket via Azure AppService (New)
 * Use the provided dockerfile inside the **server** folder to build a Docker Image
-* Push docker image to Azure eventhub
+* Use docker image to init AppService
 
 ## FastAPI/Websocket Server (Old, locally hosted option)
 * source code for the fastapi server. Open it in vscode, cd into coremotion_streaming/server, and do pip install -r requirements.txt
