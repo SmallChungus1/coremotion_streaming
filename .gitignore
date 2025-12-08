@@ -4,3 +4,4 @@ server/coremotion_venv
 *.pem
 *plist
 *.png
+*.csv
