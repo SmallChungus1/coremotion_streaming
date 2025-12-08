@@ -27,7 +27,7 @@ df_labeled = df.merge(labeled_map, on='STREAM_KEY')
 df_labeled.to_csv(source_csv_labels_save_path, index=False)
 print("Saved labeled real data.")
 
-# Syntehtic data gen using safe and risky realy data's mean and variance
+#synth data gen using safe and risky realy data's mean and variance
 safe_dist = df_labeled[df_labeled['LABEL'] == 0][features]
 risky_dist = df_labeled[df_labeled['LABEL'] == 1][features]
 

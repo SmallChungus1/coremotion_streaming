@@ -32,7 +32,7 @@ default_args = {"owner": "coremotion", "retries": 1, "retry_delay": timedelta(se
 with DAG(
     "spark_ingest_and_email",
     default_args=default_args,
-    schedule=None, #run at noon and 11pm "0 9,21 * * *"
+    schedule="0 11 21 * * *", #run at 11am and 11pm "0 11 21 * * *"
     start_date=datetime(2025, 11, 1, tzinfo=cst_tz), #set tz to cst
     catchup=False,
 ) as dag:
